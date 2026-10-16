@@ -1,6 +1,6 @@
 // hooks/useChat.js
 import { useState, useEffect, useRef } from "react";
-import { getMessagesApi, startChatApi } from "../api/chatApi";
+import { getMessagesApi, startChatApi } from "../api/ChatApi";
 import { presignAttachmentsApi, uploadFileToPresignedUrl } from "../api/attachmentApi";
 import { getWebSocketUrl } from "../config/apiConfig";
 
