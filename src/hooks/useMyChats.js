@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { getUserChatsApi } from "../api/chatApi"; // ⚠️ adjust path to wherever chatApi.js lives
+import { getUserChatsApi } from "../api/ChatApi"; // ⚠️ adjust path to wherever chatApi.js lives
 
 export function useMyChats({ limit = 10 } = {}) {
   const [chats, setChats] = useState([]);
