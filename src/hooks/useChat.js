@@ -1,7 +1,7 @@
 // hooks/useChat.js
 import { useState, useEffect, useRef } from "react";
-import { getMessagesApi, startChatApi } from "../api/chatApi";
-import { presignAttachmentsApi, uploadFileToPresignedUrl } from "../api/attachmentApi";
+import { getMessagesApi, startChatApi } from "../api/ChatApi";
+import { presignAttachmentsApi, uploadFileToPresignedUrl } from "../api/AttachmentApi";
 import { getWebSocketUrl } from "../config/apiConfig";
 
 const tempId = () => `temp_${Date.now()}`;
