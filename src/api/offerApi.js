@@ -12,7 +12,7 @@ export const addOffer = async (payload) => {
  * params: { order_id }
  */
 export const checkOffer = async (orderId) => {
-  const { data } = await axiosClient.get("/offer/check/", {
+  const { data } = await axiosClient.get("/offer/check", {
     params: { order_id: orderId },
   });
   return data;
