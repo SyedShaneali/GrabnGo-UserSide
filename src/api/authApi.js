@@ -38,7 +38,7 @@ const getDeviceId = () => {
 
 // ⭐ deviceToken is the real FCM token now ("" if the user denied / ignored the prompt).
 export const loginApi = async ({ credentials, password, timezone, deviceToken = "" }) => {
-  const res = await axiosClient.post("/pre-auth/login/", {
+  const res = await axiosClient.post("/pre-auth/login", {
     credentials,
     password,
     device_id: getDeviceId(),
