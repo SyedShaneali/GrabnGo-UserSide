@@ -29,17 +29,26 @@ export function useFcmListener() {
     // Safety net — this hook is mounted only inside the authenticated layout.
     if (!localStorage.getItem("token")) return;
 
+    // One-time cleanup of the old localStorage cache (fcm_registered_*).
+    // That cache made the app skip registration whenever it had registered the
+    // same browser token before — even if the backend had since moved that token
+    // to another account (account switch / logout / login as someone else), so
+    // the active user silently stopped receiving pushes.
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("fcm_registered_"))
+      .forEach((k) => localStorage.removeItem(k));
+
     // Registers the FCM token against whoever is the ACTIVE account right now.
-    // Needed because switching accounts in UserLayout swaps the stored token and
-    // reloads without calling login, so the new user would otherwise never get
-    // this device registered. Skips the call if this user already has this token.
+    // The backend call is an upsert, so it's safe to call on every mount. The
+    // only guard is in-memory, so StrictMode / the permission watcher can't
+    // double-fire it within the same mount.
+    let lastSynced = null;
     const syncToken = async (token) => {
-      if (!token) return;
-      const userKey = `fcm_registered_${localStorage.getItem("active_user_id") || "me"}`;
-      if (localStorage.getItem(userKey) === token) return;
+      if (!token || token === lastSynced) return;
       try {
         await registerDeviceTokenRef.current(token, "WEB");
-        localStorage.setItem(userKey, token);
+        lastSynced = token;
+        console.log("FCM token registered for the active user");
       } catch (err) {
         console.error("FCM token registration failed:", err);
       }

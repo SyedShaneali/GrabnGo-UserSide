@@ -6,8 +6,10 @@ import { TypePill, PaymentPill, formatDate, PLACEHOLDER_IMAGE } from "../../comp
 import RouteConnector from "../../components/Order/RouteConnector";
 import Modal from "../../components/common/Modal";
 import MakeOfferModal from "../../components/Order/MakeOfferModal";
+import OrderMenu from "../../components/Order/OrderMenu";
 import { useOrderDetail } from "../../hooks/useOrderDetails";
 import { useCheckOffer } from "../../hooks/useCheckOffer";
+import { useOrderActions, useOrderActivityLog } from "../../hooks/useOrderActions";
 import ChatButton from "../../components/chat/ChatButton";
 
 /* Logged-in user's id, saved in localStorage as "user_id" */
@@ -180,6 +182,17 @@ function Gallery({ images = [], alt }) {
   );
 }
 
+/* Shared button styles for confirm modals */
+const cancelBtn = {
+  padding: "8px 16px", borderRadius: 999, border: "1px solid var(--border-subtle)",
+  background: "transparent", color: "var(--text-primary)", cursor: "pointer", fontWeight: 600,
+};
+const confirmBtn = (color, busy) => ({
+  padding: "8px 16px", borderRadius: 999, border: "none",
+  background: color, color: "#fff", fontWeight: 700,
+  cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1,
+});
+
 export default function OrderDetails() {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -187,6 +200,15 @@ export default function OrderDetails() {
   const { offerExists, loading: offerCheckLoading, refetchOfferCheck } = useCheckOffer(orderId);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
+
+  // three-dots menu state
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
+
+  const { busy, error: actionError, clearError, deleteOrder, refundOrder } = useOrderActions(orderId);
+  const { logs, loading: logsLoading, error: logsError } = useOrderActivityLog(orderId, activityOpen);
 
   // Is this my own order? Compare the stored user_id with the order owner's id.
   const currentUserId = getCurrentUserId();
@@ -202,21 +224,73 @@ export default function OrderDetails() {
   // Make an Offer only for OPEN orders that are not mine
   const canMakeOffer = !!order && !isMine && isOpen;
 
+  // ASSUMPTION: "verified" = payment status is VERIFIED
+  const isVerified = order?.payment?.status?.toUpperCase() === "VERIFIED";
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/orders/${orderId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: order?.product_name, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMsg("Link copied");
+        setTimeout(() => setShareMsg(""), 2000);
+      }
+    } catch {
+      /* user cancelled share */
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteOrder();
+      navigate("/orders", { replace: true });
+    } catch {
+      /* error shown in modal */
+    }
+  };
+
+  const handleRefund = async () => {
+    try {
+      await refundOrder();
+      setRefundOpen(false);
+      refetch();
+    } catch {
+      /* error shown in modal */
+    }
+  };
+
+  const menuItems = [
+    { key: "edit", label: "Edit order", onClick: () => navigate(`/orders/${orderId}/edit`) },
+    { key: "refund", label: "Refund order", show: isVerified, onClick: () => { clearError(); setRefundOpen(true); } },
+    { key: "log", label: "Activity log", onClick: () => setActivityOpen(true) },
+    { key: "share", label: "Share order", onClick: handleShare },
+    { key: "delete", label: "Delete order", danger: true, onClick: () => { clearError(); setDeleteOpen(true); } },
+  ];
+
   return (
     <div className="px-4 sm:px-6" style={{ paddingTop: 20, paddingBottom: 32, width: "100%" }}>
-      <button
-        onClick={() => navigate(-1)}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16,
-          background: "none", border: "none", cursor: "pointer",
-          color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, padding: 0,
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        Back
-      </button>
+      {/* Top bar: back + three dots */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "none", border: "none", cursor: "pointer",
+            color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, padding: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {shareMsg && <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{shareMsg}</span>}
+          {order && isMine && <OrderMenu items={menuItems} />}
+        </div>
+      </div>
 
       {error && (
         <div style={{
@@ -341,34 +415,36 @@ export default function OrderDetails() {
               )}
             />
           </Section>
-{order.owner && (
-  <Section title="Order Owner">
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-        <Avatar name={order.owner.name} src={order.owner.image} />
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-            {order.owner.name}
-          </p>
-          {order.owner.about && (
-            <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0" }}>
-              {order.owner.about}
-            </p>
+
+          {order.owner && (
+            <Section title="Order Owner">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                  <Avatar name={order.owner.name} src={order.owner.image} />
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                      {order.owner.name}
+                    </p>
+                    {order.owner.about && (
+                      <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                        {order.owner.about}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!isMine && (
+                  <ChatButton
+                    orderId={order.id}
+                    userId={order.owner.id}
+                    name={order.owner.name}
+                    email={order.owner.email}
+                    image={order.owner.image}
+                  />
+                )}
+              </div>
+            </Section>
           )}
-        </div>
-      </div>
-      {!isMine && (
-        <ChatButton
-          orderId={order.id}
-          userId={order.owner.id}
-          name={order.owner.name}
-          email={order.owner.email}
-          image={order.owner.image}
-        />
-      )}
-    </div>
-  </Section>
-)}
+
           {/* Not mine + OPEN     -> Make an Offer / View Offer
               Mine + OPEN         -> Track Order (faded, disabled)
               Mine + not OPEN     -> Track Order
@@ -406,6 +482,7 @@ export default function OrderDetails() {
             </button>
           )}
 
+          {/* Checklist */}
           <Modal open={checklistOpen} onClose={() => setChecklistOpen(false)}>
             <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 14px" }}>
               Checklist
@@ -415,6 +492,64 @@ export default function OrderDetails() {
                 <li key={i} style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>{item}</li>
               ))}
             </ul>
+          </Modal>
+
+          {/* Activity log */}
+          <Modal open={activityOpen} onClose={() => setActivityOpen(false)}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 14px" }}>
+              Activity Log
+            </p>
+            {logsLoading && <p style={{ fontSize: 13.5, color: "var(--text-muted)", margin: 0 }}>Loading…</p>}
+            {logsError && <p style={{ fontSize: 13.5, color: "var(--danger)", margin: 0 }}>{logsError}</p>}
+            {!logsLoading && !logsError && logs.length === 0 && (
+              <p style={{ fontSize: 13.5, color: "var(--text-muted)", margin: 0 }}>No activity yet</p>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "60vh", overflowY: "auto" }}>
+              {logs.map((l, i) => (
+                <div key={l.id ?? i} style={{ paddingBottom: 10, borderBottom: "1px solid var(--bg-surface-hover)" }}>
+                  <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                    {l.action || l.title || l.message || l.description}
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
+                    {[l.user?.name || l.performed_by, l.created_at && formatDate(l.created_at)].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Modal>
+
+          {/* Refund */}
+          <Modal open={refundOpen} onClose={() => !busy && setRefundOpen(false)}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 8px" }}>
+              Refund order?
+            </p>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: "0 0 16px" }}>
+              This will refund the verified payment for order #{order.id}.
+            </p>
+            {actionError && <p style={{ fontSize: 13, color: "var(--danger)", margin: "0 0 12px" }}>{actionError}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setRefundOpen(false)} disabled={busy} style={cancelBtn}>Cancel</button>
+              <button onClick={handleRefund} disabled={busy} style={confirmBtn("var(--success, #0d9488)", busy)}>
+                {busy ? "Refunding…" : "Refund"}
+              </button>
+            </div>
+          </Modal>
+
+          {/* Delete */}
+          <Modal open={deleteOpen} onClose={() => !busy && setDeleteOpen(false)}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 8px" }}>
+              Delete order?
+            </p>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: "0 0 16px" }}>
+              This can't be undone.
+            </p>
+            {actionError && <p style={{ fontSize: 13, color: "var(--danger)", margin: "0 0 12px" }}>{actionError}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setDeleteOpen(false)} disabled={busy} style={cancelBtn}>Cancel</button>
+              <button onClick={handleDelete} disabled={busy} style={confirmBtn("var(--danger)", busy)}>
+                {busy ? "Deleting…" : "Delete"}
+              </button>
+            </div>
           </Modal>
 
           {canMakeOffer && (

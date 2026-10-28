@@ -1,6 +1,6 @@
 // ─── Base URLs per environment ────────────────────────────────────────────────
 const BASE_URLS = {
-  development: 'http://192.168.16.152:1122',
+  development: 'http://72.255.34.72:31796',
   staging: 'https://staging-api.grabngo.pk',
   production: 'https://prodapi.grabngo.com.pk',
 };

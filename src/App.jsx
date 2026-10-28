@@ -22,6 +22,7 @@ import ChatsListScreen from "./screens/chat/ChatLIstScreen";
 import Register from "./screens/auth/Register";
 import VerifyOtp from "./screens/auth/VerifyOtp";
 import Notifications from "./screens/user/Notifications";
+import EditOrder from "./screens/order/EditOrder";
 
 // ⭐ Only mounts once the user is inside the layout (i.e. after login), so it
 // never runs on the Login page with no token yet. It remounts on every login /
@@ -64,6 +65,7 @@ function App() {
                 <Route path="/chat/:id" element={<ChatScreen />} />
                 <Route path="/chat" element={<ChatsListScreen />} />
                 <Route path="/notifications" element={<div className="p-6"><Notifications/></div>} />
+                <Route path="/orders/:orderId/edit" element={<EditOrder />} />
 
                 <Route path="/profile" element={<div className="p-6">Profile</div>} />
               </Route>

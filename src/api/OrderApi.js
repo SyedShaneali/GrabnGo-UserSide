@@ -53,4 +53,23 @@ export const updateOrderStatusApi = async (orderId, { status, orderCancelReason,
   });
   return data;
 };
+/** PUT /grabngo/api/v1/order/{order_id} — body only, no query params */
+export const updateOrderApi = async (orderId, body = {}) => {
+  const { data } = await axiosClient.put(`/order/${orderId}`, body);
+  return data;
+};
+
+/** ASSUMED endpoints, change to match your backend */
+export const deleteOrderApi = async (orderId) => {
+  const { data } = await axiosClient.delete(`/order/${orderId}`);
+  return data;
+};
+export const refundOrderApi = async (orderId) => {
+  const { data } = await axiosClient.post(`/order/${orderId}/refund`);
+  return data;
+};
+export const getOrderActivityLogApi = async (orderId) => {
+  const { data } = await axiosClient.get(`/order/${orderId}/activity-log`);
+  return data;
+};
  
